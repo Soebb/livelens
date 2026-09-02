@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  analyze-test:
+    name: Analyze & Test (Dart)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      - name: Test
+        run: flutter test
+
+  privacy-guard:
+    name: G-01 Privacy Guard (no INTERNET permission)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: G-01 network-permission guard (scoped allowlist)
+        # G-01: zero network egress except the model CDN. Exactly one
+        # INTERNET declaration is allowed — the app manifest, required by
+        # the Epic-6 model downloader (E-02, ModelDownloadManager). No other
+        # network permission is ever acceptable.
+        run: |
+          count=$(grep -rl "android.permission.INTERNET" \
+              android/app/src --include=AndroidManifest.xml | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Expected exactly one INTERNET declaration (app manifest); found $count"
+            exit 1
+          fi
+          if grep -rn -E "android.permission.(ACCESS_NETWORK_STATE|ACCESS_WIFI_STATE|CHANGE_NETWORK_STATE|CHANGE_WIFI_STATE)" \
+              android/app/src --include=AndroidManifest.xml; then
+            echo "::error::Unexpected network permission — violates the G-01 allowlist"
+            exit 1
+          fi
+          echo "OK: INTERNET present for the model CDN only; no other network permissions."
+
+      - name: Fail if HTTP client usage appears outside approved modules
+        # Belt-and-braces: dart:io HttpClient / package:http imports are not
+        # expected anywhere yet. When Epic 6 adds the downloader, extend the
+        # exclusion list to lib/src/models/downloader/ ONLY.
+        run: |
+          hits=$(grep -rln -E "package:http/|dart:io.*HttpClient|HttpClient\(" lib || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Network-capable code found outside approved modules:"
+            echo "$hits"
+            exit 1
+          else
+            echo "OK: no network code paths in lib/."
+          fi

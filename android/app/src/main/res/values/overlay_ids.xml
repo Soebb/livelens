@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Overlay view ids (Epic 4) — overlay tree is built in code, only ids live here. -->
+<resources>
+    <item type="id" name="overlay_card"/>
+    <item type="id" name="overlay_chips"/>
+    <item type="id" name="overlay_source"/>
+    <item type="id" name="overlay_main"/>
+</resources>
