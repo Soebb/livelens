@@ -18,9 +18,9 @@ searchable bilingual transcripts you can edit and export.
 
 
 <p align="center">
-  <img width="275" height="600" alt="LiveLens screenshot 1" src="https://github.com/user-attachments/assets/51f8290f-cb51-461b-a0d2-24c4daadc7db" />
   <img width="275" height="600" alt="LiveLens screenshot 2" src="https://github.com/user-attachments/assets/bd8390f0-536b-4be9-8d41-ce70b21afcb2" />
   <img width="275" height="600" alt="LiveLens screenshot 3" src="https://github.com/user-attachments/assets/c4aaa976-b663-4938-bb0d-fecc18ad0901" />
+  <img width="275" height="600" alt="LiveLens screenshot 1" src="https://github.com/user-attachments/assets/51f8290f-cb51-461b-a0d2-24c4daadc7db" />
 </p>
 <p align="center">
   <img width="275" height="600" alt="LiveLens screenshot 4" src="https://github.com/user-attachments/assets/605424e1-85d3-4b97-83d5-78a31add5781" />
