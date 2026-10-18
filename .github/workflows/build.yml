@@ -1,0 +1,80 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.32.8 # matches the revision in .metadata
+          cache: true
+
+      - name: Install Android NDK
+        # android/app/build.gradle.kts pins ndkVersion = "27.0.12077973"
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.0.12077973" > /dev/null
+
+      - name: Cache model assets
+        id: models-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets/sherpa-onnx-whisper-base
+            assets/sherpa-onnx-silero-vad
+          key: livelens-models-whisper-base-int8-silero-vad-v4
+
+      - name: Download model assets
+        # These folders are gitignored but listed in pubspec.yaml, so the build
+        # fails without them. File list comes from ModelCatalog.kt / VadWorker.kt.
+        if: steps.models-cache.outputs.cache-hit != 'true'
+        run: |
+          HF=https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base/resolve/main
+          mkdir -p assets/sherpa-onnx-whisper-base assets/sherpa-onnx-silero-vad
+          for f in base-encoder.int8.onnx base-decoder.int8.onnx base-tokens.txt; do
+            curl -fL --retry 3 -o "assets/sherpa-onnx-whisper-base/$f" "$HF/$f"
+          done
+          curl -fL --retry 3 -o assets/sherpa-onnx-silero-vad/silero_vad.onnx \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx
+
+      - name: Use official Maven repos
+        # The Gradle files list China-region mirrors first. On GitHub runners the
+        # google()/mavenCentral() fallbacks are faster and more reliable.
+        run: |
+          sed -i -E '/maven\("https:\/\/(storage\.flutter-io\.cn|mirrors\.cloud\.tencent\.com|repo\.huaweicloud\.com)/d' \
+            android/settings.gradle.kts android/build.gradle.kts
+
+      - name: Build APK
+        # The app ships arm64-only native libs (sherpa-onnx), so build arm64 only.
+        # On tag builds, the tag (v1.2.3 -> 1.2.3) becomes the app's versionName.
+        run: |
+          flutter pub get
+          VERSION_ARGS=()
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION_ARGS=(--build-name="${GITHUB_REF_NAME#v}")
+          fi
+          flutter build apk --release --target-platform android-arm64 "${VERSION_ARGS[@]}"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: livelens-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
